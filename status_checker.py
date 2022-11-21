@@ -5,9 +5,11 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict
 from utils import request
+from tabulate import tabulate
 from datetime import (
     date,
     datetime,
+    timedelta,
 )
 
 
@@ -46,9 +48,11 @@ class StatusChecker:
         },
     }
 
-    _all_result_types = {
-        **result_types["build"],
-        **result_types["tests"],
+    parsed_result_type = {
+        "warnings": "W:",
+        "errors": "E:",
+        "PASS": "P:",
+        "FAIL": "F:",
     }
 
     hidden_platform_prefix = "x86_64_v2-centos7-gcc11"
@@ -122,25 +126,37 @@ class StatusChecker:
                         platform.replace(self.hidden_platform_prefix, "*")
                         for platform in project["results"].keys()
                     ]
-                    nested_results_cols = [("Project", "")]
+                    nested_results_cols = [("Project", ""), ("Failed MRs", "")]
                     nested_results_cols += [
-                        (platform, result_type)
-                        for platform in short_platforms
-                        for result_type in self._all_result_types
+                        (platform, "BUILD / TEST") for platform in short_platforms
                     ]
                     df = pd.DataFrame(
                         columns=pd.MultiIndex.from_tuples(nested_results_cols)
                     )
                 ptf_res = []
                 for platform, results in project["results"].items():
+                    tmp_res = []
                     for check_type, check_values in self.result_types.items():
+                        tmp_tmp_res = []
                         for result_type, result_name in check_values.items():
                             try:
-                                ptf_res.append(results[check_type][result_name])
+                                tmp_tmp_res.append(
+                                    f"{self.parsed_result_type[result_name]}"
+                                    f"{str(results[check_type][result_name])}"
+                                )
                             except TypeError:
-                                ptf_res.append("UNKNOWN")
+                                tmp_tmp_res = ["UNKNOWN"]
+                                break
+                        tmp_res.append(" ".join(tmp_tmp_res))
+                    ptf_res.append(" / ".join(tmp_res))
+                failed_MRs = []
+                if project["checkout"] and "warnings" in project["checkout"]:
+                    for warn in project["checkout"]["warnings"]:
+                        tmp_res = re.findall(rf"{project['name']}\![0-9]{{1,5}}", warn)
+                        failed_MRs += [r.replace(project["name"], "") for r in tmp_res]
                 df.loc[len(df.index)] = [
                     project["name"],
+                    ",".join(failed_MRs),
                     *ptf_res,
                 ]
         return (df, parsed["date"])
@@ -149,45 +165,62 @@ class StatusChecker:
     def check_status(
         self,
         date_to_check: date = date.today(),
+        days: int = 1,
     ):
-        parsed_date = date_to_check.strftime(self.date_format)
+        msgs = defaultdict(dict)
         for slot, build_id in self._slots.items():
-            msg = ""
             tmp_build_id = build_id
-            try:
-                count = 0
-                while True:
-                    count += 1
-                    if count > self.max_backward_checks:
-                        msg = f"Cannot find {slot} for {parsed_date}"
-                        logging.error(msg)
-                        raise ValueError(msg)
-                    df, retrieved_date = self._fetch_build_info(
-                        slot,
-                        tmp_build_id,
-                        parsed_date,
+            for day_delta in range(days):
+                date_back = date_to_check - timedelta(days=day_delta)
+                parsed_date = date_back.strftime(self.date_format)
+                msgs[slot][date_back] = {}
+                try:
+                    count = 0
+                    while True:
+                        count += 1
+                        if count > self.max_backward_checks:
+                            msg = f"Cannot find {slot} for {parsed_date}"
+                            logging.error(msg)
+                            raise ValueError(msg)
+                        df, retrieved_date = self._fetch_build_info(
+                            slot,
+                            tmp_build_id,
+                            parsed_date,
+                        )
+                        prdate = datetime.strptime(
+                            retrieved_date,
+                            self.date_format,
+                        )
+                        if df.empty or prdate > date_back:
+                            tmp_build_id -= 1
+                            continue
+                        elif prdate < date_back:
+                            break
+                        else:
+                            msgs[slot][date_back]["build_id"] = tmp_build_id
+                            msgs[slot][date_back]["df"] = df
+                            break
+                except AttributeError as err:
+                    logging.warning(
+                        f"Retrieving information for '{slot}/{build_id}' "
+                        f" did not work. Error: '{err}'"
                     )
-                    prdate = datetime.strptime(
-                        retrieved_date,
-                        self.date_format,
+        stream = ""
+        for slot, m_values in msgs.items():
+            sorted_m_values = dict(sorted(m_values.items(), key=lambda x: x[0]))
+            for date_back, values in sorted_m_values.items():
+                parsed_date = date_back.strftime(self.date_format)
+                if values:
+                    stream += f"-> {slot}/{parsed_date}/{values['build_id']}:\n"
+                    table = tabulate(
+                        values["df"],
+                        headers=list(map("\n".join, values["df"].columns.tolist())),
+                        tablefmt="pretty",
                     )
-                    if df.empty or prdate > date_to_check:
-                        tmp_build_id -= 1
-                        continue
-                    elif prdate < date_to_check:
-                        msg = f"No {slot} available on {parsed_date}."
-                        break
-                    else:
-                        msg += f"{slot}/{tmp_build_id}: \n"
-                        msg += f"{df.to_string()}\n"
-                        break
-            except AttributeError as err:
-                logging.warning(
-                    f"Retrieving information for '{slot}/{build_id}' "
-                    f" did not work. Error: '{err}'"
-                )
-                msg += "Something went wrong..."
-            logging.info(msg)
+                    stream += f"{table}\n"
+                else:
+                    stream += f"-> {slot}/{parsed_date}: No slot available\n"
+        logging.info(stream)
 
     @request
     def dqcs_report(
