@@ -63,7 +63,25 @@ def current_status(date, slots, platforms, projects):
     default=7,
     help="number of days to include in the report",
 )
-def dqcs_report(date, slots, platforms, projects, days):
+@click.option(
+    "--html",
+    default=True,
+    help="write in HTML format",
+)
+@click.option(
+    "--filepath",
+    default="output.html",
+    help="path to a file",
+)
+def dqcs_report(
+    date,
+    slots,
+    platforms,
+    projects,
+    days,
+    html,
+    filepath,
+):
     """Prepare the DQCS report."""
     checker = StatusChecker(
         slot_names=slots,
@@ -76,6 +94,8 @@ def dqcs_report(date, slots, platforms, projects, days):
             StatusChecker.date_format,
         ),
         days=days,
+        html=html,
+        filepath=filepath,
     )
 
 

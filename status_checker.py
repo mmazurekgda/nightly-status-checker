@@ -2,9 +2,11 @@ import requests
 import re
 import logging
 import pandas as pd
-import numpy as np
 from collections import defaultdict
-from utils import request
+from utils import (
+    request,
+    color_values,
+)
 from tabulate import tabulate
 from datetime import (
     date,
@@ -25,6 +27,7 @@ class StatusChecker:
         "Gaudi",
         "Geant4",
         "Detector",
+        "LHCb",
         "Run2Support",
         "GaussinoExtLibs",
         "Gaussino",
@@ -33,8 +36,8 @@ class StatusChecker:
 
     platforms_to_check = [
         "x86_64_v2-centos7-gcc11-opt",
-        "x86_64_v2-centos7-gcc11-dbg",
         "x86_64_v2-centos7-gcc11+dd4hep-opt",
+        "x86_64_v2-centos7-gcc11-dbg",
     ]
 
     result_types = {
@@ -124,7 +127,8 @@ class StatusChecker:
                 if df.empty:
                     short_platforms = [
                         platform.replace(self.hidden_platform_prefix, "*")
-                        for platform in project["results"].keys()
+                        for platform in self.platforms_to_check
+                        if platform in project["results"]
                     ]
                     nested_results_cols = [("Project", ""), ("Failed MRs", "")]
                     nested_results_cols += [
@@ -134,7 +138,10 @@ class StatusChecker:
                         columns=pd.MultiIndex.from_tuples(nested_results_cols)
                     )
                 ptf_res = []
-                for platform, results in project["results"].items():
+                for platform in self.platforms_to_check:
+                    if platform not in project["results"]:
+                        continue
+                    results = project["results"][platform]
                     tmp_res = []
                     for check_type, check_values in self.result_types.items():
                         tmp_tmp_res = []
@@ -166,6 +173,8 @@ class StatusChecker:
         self,
         date_to_check: date = date.today(),
         days: int = 1,
+        html: bool = False,
+        filepath: str = "",
     ):
         msgs = defaultdict(dict)
         for slot, build_id in self._slots.items():
@@ -198,7 +207,7 @@ class StatusChecker:
                             break
                         else:
                             msgs[slot][date_back]["build_id"] = tmp_build_id
-                            msgs[slot][date_back]["df"] = df
+                            msgs[slot][date_back]["df"] = df.reset_index(drop=True)
                             break
                 except AttributeError as err:
                     logging.warning(
@@ -208,46 +217,35 @@ class StatusChecker:
         stream = ""
         for slot, m_values in msgs.items():
             sorted_m_values = dict(sorted(m_values.items(), key=lambda x: x[0]))
+            if html:
+                stream += f"<h4 class='part'>{slot}</h4>\n"
             for date_back, values in sorted_m_values.items():
                 parsed_date = date_back.strftime(self.date_format)
                 if values:
-                    stream += f"-> {slot}/{parsed_date}/{values['build_id']}:\n"
-                    table = tabulate(
-                        values["df"],
-                        headers=list(map("\n".join, values["df"].columns.tolist())),
-                        tablefmt="pretty",
-                    )
-                    stream += f"{table}\n"
+                    if html:
+                        stream += f"<details><summary>{parsed_date}/{values['build_id']}</summary>"
+                        stream += f"link to <a href=\"https://lhcb-nightlies.web.cern.ch/nightly/{slot}/{values['build_id']}/\">"
+                        stream += f"{slot}/{values['build_id']}</a></br>"
+                        pretty_df = values["df"].style.applymap(color_values)
+                        stream += f"{pretty_df.to_html()}</details>"
+                    else:
+                        stream += f"-> {slot}/{parsed_date}/{values['build_id']}:\n"
+                        table = tabulate(
+                            values["df"],
+                            headers=list(map("\n".join, values["df"].columns.tolist())),
+                            tablefmt="pretty",
+                        )
+                        stream += f"{table}\n"
                 else:
-                    stream += f"-> {slot}/{parsed_date}: No slot available\n"
-        logging.info(stream)
-
-    @request
-    def dqcs_report(
-        self,
-        report_date: date = date.today(),
-        days: int = 7,
-    ):
-        parsed_date = report_date.strftime(self.date_format)
-        for slot, build_id in self._slots.items():
-            msg = ""
-            tmp_build_id = build_id
-            try:
-                while True:
-                    df = self.fetch_build_info(
-                        slot,
-                        tmp_build_id,
-                        parsed_date,
-                    )
-                    if df.empty:
-                        continue
-                    msg += f"{slot}/{build_id}:\n"
-                    msg += f"{df.to_string()}\n"
-                    break
-            except AttributeError as err:
-                logging.warning(
-                    f"Retrieving information for '{slot}/{build_id}' "
-                    f" did not work. Error: '{err}'"
-                )
-                msg += "Something went wrong..."
-            logging.info(msg)
+                    if html:
+                        stream += (
+                            f"<details><summary>{parsed_date}/(No build)</summary>"
+                        )
+                        stream += "No build available for this day.</details>"
+                    else:
+                        stream += f"-> {slot}/{parsed_date}: No slot available\n"
+        if filepath:
+            with open(filepath, "w") as f:
+                f.write(stream)
+        else:
+            logging.info(stream)

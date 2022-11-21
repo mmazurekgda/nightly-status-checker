@@ -1,5 +1,6 @@
 import requests
 import logging
+import re
 
 
 def request(get_response):
@@ -17,3 +18,14 @@ def request(get_response):
             raise err
 
     return wrapper
+
+
+def color_values(value: str):
+    color = "black"
+    if re.search(r"(?:E:|F:)0", value):
+        color = "green"
+    if re.search(r"W:[1-9][0-9]{0,3}", value):
+        color = "orange"
+    if re.search(r"(?:E:|F:)[1-9][0-9]{0,3}", value):
+        color = "red"
+    return f"color: {color}"
