@@ -156,6 +156,11 @@ class StatusChecker:
                                     f"{self.parsed_result_type[result_name]}"
                                     f"{str(results[check_type][result_name])}"
                                 )
+                            except KeyError:
+                                logging.debug(
+                                    f'Missing key [{check_type}][{result_name}] in {results}. Output will be incomplete')
+                                tmp_tmp_res = ["UNKNOWN"]
+                                break
                             except TypeError:
                                 tmp_tmp_res = ["UNKNOWN"]
                                 break
