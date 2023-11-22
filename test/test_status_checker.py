@@ -1,11 +1,13 @@
 import subprocess
 
 
-def test_cli_simple_training():
+def test_status_checker():
     ex_generate = subprocess.run(
         [
             "python",
             "run.py",
+            "--verbosity",
+            "DEBUG",
             "current-status",
             "--slots",
             "lhcb-sim11",
