@@ -18,9 +18,9 @@ from datetime import (
 class StatusChecker:
 
     slots_to_check = [
-        "lhcb-gauss-dev",
+        "lhcb-sim10-dev",
         "lhcb-sim10",
-        "lhcb-gaussino",
+        "lhcb-sim11",
     ]
 
     projects_to_check = [
@@ -36,8 +36,11 @@ class StatusChecker:
 
     platforms_to_check = [
         "x86_64_v2-centos7-gcc11-opt",
-        "x86_64_v2-centos7-gcc11+dd4hep-opt",
+        "x86_64_v2-centos7-gcc11+detdesc-opt",
         "x86_64_v2-centos7-gcc11-dbg",
+        "x86_64_v2-centos7-gcc12-opt",
+        "x86_64_v2-centos7-gcc12+detdesc-opt",
+        "x86_64_v2-el9-gcc12-opt",
     ]
 
     result_types = {
@@ -59,6 +62,7 @@ class StatusChecker:
     }
 
     hidden_platform_prefix = "x86_64_v2-centos7-gcc11"
+    hidden_platform_prefix_re = r'x86_64_v2(-centos7)?(-gcc11)?'
 
     # there is no way you can get the list of build ids
     # from the API, so we have to use the main page...
@@ -121,12 +125,13 @@ class StatusChecker:
         response.raise_for_status()
         parsed = response.json()
         if parsed["aborted"]:
-            return (df, parsed_date)
+            return df, parsed_date
         for project in parsed["projects"]:
             if project["name"] in self.projects_to_check and project["enabled"]:
                 if df.empty:
                     short_platforms = [
-                        platform.replace(self.hidden_platform_prefix, "*")
+                        # platform.replace(self.hidden_platform_prefix, "*")
+                        re.sub(self.hidden_platform_prefix_re, '*', platform)
                         for platform in self.platforms_to_check
                         if platform in project["results"]
                     ]
@@ -151,6 +156,11 @@ class StatusChecker:
                                     f"{self.parsed_result_type[result_name]}"
                                     f"{str(results[check_type][result_name])}"
                                 )
+                            except KeyError:
+                                logging.debug(
+                                    f'Missing key [{check_type}][{result_name}] in {results}. Output will be incomplete')
+                                tmp_tmp_res = ["UNKNOWN"]
+                                break
                             except TypeError:
                                 tmp_tmp_res = ["UNKNOWN"]
                                 break
@@ -170,7 +180,7 @@ class StatusChecker:
                     ",".join(failed_MRs),
                     *ptf_res,
                 ]
-        return (df, parsed["date"])
+        return df, parsed["date"]
 
     @request
     def check_status(
