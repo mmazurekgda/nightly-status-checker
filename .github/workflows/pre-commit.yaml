@@ -14,16 +14,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Python
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.9.18
         uses: actions/setup-python@v3
         with:
-          python-version: 3.9.18
-
-      - name: Install pre-commit
-        run: pip install pre-commit
+          python-version: '3.9.18'
+      - name: Add conda to system path
+        run: |
+          # $CONDA is an environment variable pointing to the root of the miniconda directory
+          echo $CONDA/bin >> $GITHUB_PATH
+      - name: Install dependencies
+        run: |
+          conda env update --file environment.yml --name base
 
       - name: Run pre-commit
         run: pre-commit run --all-files
