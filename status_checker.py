@@ -16,7 +16,6 @@ from datetime import (
 
 
 class StatusChecker:
-
     slots_to_check = [
         "lhcb-sim10-dev",
         "lhcb-sim10",
@@ -62,7 +61,7 @@ class StatusChecker:
     }
 
     hidden_platform_prefix = "x86_64_v2-centos7-gcc11"
-    hidden_platform_prefix_re = r'x86_64_v2(-centos7)?(-gcc11)?'
+    hidden_platform_prefix_re = r"x86_64_v2(-centos7)?(-gcc11)?"
 
     # there is no way you can get the list of build ids
     # from the API, so we have to use the main page...
@@ -97,7 +96,9 @@ class StatusChecker:
         response.raise_for_status()
         slots_reg = "|".join(self.slots_to_check)
         slots_reg = rf"(?:{slots_reg})\/[0-9]{{1,4}}\/"
-        slot_candidates = re.findall(slots_reg, response.content.decode("utf-8"))
+        slot_candidates = re.findall(
+            slots_reg, response.content.decode("utf-8")
+        )
         if not slot_candidates:
             msg = (
                 f"No slots from the list '{self.slots_to_check}' "
@@ -127,17 +128,21 @@ class StatusChecker:
         if parsed["aborted"]:
             return df, parsed_date
         for project in parsed["projects"]:
-            if project["name"] in self.projects_to_check and project["enabled"]:
+            if (
+                project["name"] in self.projects_to_check
+                and project["enabled"]
+            ):
                 if df.empty:
                     short_platforms = [
                         # platform.replace(self.hidden_platform_prefix, "*")
-                        re.sub(self.hidden_platform_prefix_re, '*', platform)
+                        re.sub(self.hidden_platform_prefix_re, "*", platform)
                         for platform in self.platforms_to_check
                         if platform in project["results"]
                     ]
                     nested_results_cols = [("Project", ""), ("Failed MRs", "")]
                     nested_results_cols += [
-                        (platform, "BUILD / TEST") for platform in short_platforms
+                        (platform, "BUILD / TEST")
+                        for platform in short_platforms
                     ]
                     df = pd.DataFrame(
                         columns=pd.MultiIndex.from_tuples(nested_results_cols)
@@ -156,16 +161,15 @@ class StatusChecker:
                                     f"{self.parsed_result_type[result_name]}"
                                     f"{str(results[check_type][result_name])}"
                                 )
-                            except KeyError:
-                                logging.debug(
-                                    f'Missing key [{check_type}][{result_name}] in {results}. Output will be incomplete')
-                                tmp_tmp_res = ["UNKNOWN"]
-                                break
                             except TypeError:
                                 tmp_tmp_res = ["UNKNOWN"]
                                 break
                             except KeyError:
-                                logging.debug(f'Missing key [{check_type}][{result_name}] in {results}. Output will be incomplete')
+                                logging.debug(
+                                    f"Missing key [{check_type}]"
+                                    f"[{result_name}] in {results}. "
+                                    "Output will be incomplete"
+                                )
                                 tmp_tmp_res = ["UNKNOWN"]
                                 break
                         tmp_res.append(" ".join(tmp_tmp_res))
@@ -173,8 +177,13 @@ class StatusChecker:
                 failed_MRs = []
                 if project["checkout"] and "warnings" in project["checkout"]:
                     for warn in project["checkout"]["warnings"]:
-                        tmp_res = re.findall(rf"{project['name']}\![0-9]{{1,5}}", warn)
-                        failed_MRs += [r.replace(project["name"], "") for r in tmp_res]
+                        tmp_res = re.findall(
+                            rf"{project['name']}\![0-9]{{1,5}}",
+                            warn,
+                        )
+                        failed_MRs += [
+                            r.replace(project["name"], "") for r in tmp_res
+                        ]
                 df.loc[len(df.index)] = [
                     project["name"],
                     ",".join(failed_MRs),
@@ -221,7 +230,9 @@ class StatusChecker:
                             break
                         else:
                             msgs[slot][date_back]["build_id"] = tmp_build_id
-                            msgs[slot][date_back]["df"] = df.reset_index(drop=True)
+                            msgs[slot][date_back]["df"] = df.reset_index(
+                                drop=True
+                            )
                             break
                 except AttributeError as err:
                     logging.warning(
@@ -230,34 +241,40 @@ class StatusChecker:
                     )
         stream = ""
         for slot, m_values in msgs.items():
-            sorted_m_values = dict(sorted(m_values.items(), key=lambda x: x[0]))
+            sorted_m_values = dict(
+                sorted(m_values.items(), key=lambda x: x[0])
+            )
             if html:
                 stream += f"<h4 class='part'>{slot}</h4>\n"
             for date_back, values in sorted_m_values.items():
                 parsed_date = date_back.strftime(self.date_format)
                 if values:
                     if html:
-                        stream += f"<details><summary>{parsed_date}/{values['build_id']}</summary>"
-                        stream += f"link to <a href=\"https://lhcb-nightlies.web.cern.ch/nightly/{slot}/{values['build_id']}/\">"
+                        stream += f"<details><summary>{parsed_date}/{values['build_id']}</summary>"  # noqa: E501
+                        stream += f"link to <a href=\"https://lhcb-nightlies.web.cern.ch/nightly/{slot}/{values['build_id']}/\">"  # noqa: E501
                         stream += f"{slot}/{values['build_id']}</a></br>"
                         pretty_df = values["df"].style.applymap(color_values)
                         stream += f"{pretty_df.to_html()}</details>"
                     else:
-                        stream += f"-> {slot}/{parsed_date}/{values['build_id']}:\n"
+                        stream += (
+                            f"-> {slot}/{parsed_date}/{values['build_id']}:\n"
+                        )
                         table = tabulate(
                             values["df"],
-                            headers=list(map("\n".join, values["df"].columns.tolist())),
+                            headers=list(
+                                map("\n".join, values["df"].columns.tolist())
+                            ),
                             tablefmt="pretty",
                         )
                         stream += f"{table}\n"
                 else:
                     if html:
-                        stream += (
-                            f"<details><summary>{parsed_date}/(No build)</summary>"
-                        )
+                        stream += f"<details><summary>{parsed_date}/(No build)</summary>"  # noqa: E501
                         stream += "No build available for this day.</details>"
                     else:
-                        stream += f"-> {slot}/{parsed_date}: No slot available\n"
+                        stream += (
+                            f"-> {slot}/{parsed_date}: No slot available\n"
+                        )
         if filepath:
             with open(filepath, "w") as f:
                 f.write(stream)
