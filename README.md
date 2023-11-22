@@ -2,18 +2,37 @@
 
 ## Installation
 
+### on lxplus
+
 Make sure you are in the LHCb environment:
 
 ```console
 source /cvmfs/lhcb.cern.ch/lib/LbEnv
 ```
+
 Install the required packages in the local environment
 ```console
 python3 -m venv env
+```
+```console
 source env/bin/activate
+```
+```console
 pip install -r requirements.txt
-# or if that does not work
-# pip install click requests pandas tabulate Jinja2
+```
+
+### locally with conda
+
+You have to have conda installed. Then:
+
+```console
+conda env update --file environment.yml --name nightly-checker-env
+```
+
+Activate the environment:
+
+```console
+conda activate nightly-checker-env
 ```
 
 ## Examples
