@@ -60,7 +60,6 @@ class StatusChecker:
         "FAIL": "F:",
     }
 
-    hidden_platform_prefix = "x86_64_v2-centos7-gcc11"
     hidden_platform_prefix_re = r"x86_64_v2(-centos7)?(-gcc11)?"
 
     # there is no way you can get the list of build ids
@@ -127,6 +126,8 @@ class StatusChecker:
         parsed = response.json()
         if parsed["aborted"]:
             return df, parsed_date
+        errors_summary = defaultdict(lambda: 0)
+        failed_summary = defaultdict(lambda: 0)
         for project in parsed["projects"]:
             if (
                 project["name"] in self.projects_to_check
@@ -155,11 +156,21 @@ class StatusChecker:
                     tmp_res = []
                     for check_type, check_values in self.result_types.items():
                         tmp_tmp_res = []
-                        for result_type, result_name in check_values.items():
+                        for result_name in check_values.values():
                             try:
+                                counter = int(results[check_type][result_name])
+                                if counter:
+                                    if result_name == "errors":
+                                        errors_summary[
+                                            project["name"]
+                                        ] += counter
+                                    if result_name == "FAIL":
+                                        failed_summary[
+                                            project["name"]
+                                        ] += counter
                                 tmp_tmp_res.append(
                                     f"{self.parsed_result_type[result_name]}"
-                                    f"{str(results[check_type][result_name])}"
+                                    f"{counter}"
                                 )
                             except TypeError:
                                 tmp_tmp_res = ["UNKNOWN"]
@@ -189,7 +200,7 @@ class StatusChecker:
                     ",".join(failed_MRs),
                     *ptf_res,
                 ]
-        return df, parsed["date"]
+        return df, parsed["date"], errors_summary, failed_summary
 
     @request
     def check_status(
@@ -200,6 +211,8 @@ class StatusChecker:
         filepath: str = "",
     ):
         msgs = defaultdict(dict)
+        errors_summary = defaultdict(lambda: 0)
+        failed_summary = defaultdict(lambda: 0)
         for slot, build_id in self._slots.items():
             tmp_build_id = build_id
             for day_delta in range(days):
@@ -214,7 +227,12 @@ class StatusChecker:
                             msg = f"Cannot find {slot} for {parsed_date}"
                             logging.error(msg)
                             raise ValueError(msg)
-                        df, retrieved_date = self._fetch_build_info(
+                        (
+                            df,
+                            retrieved_date,
+                            error_summary_tmp,
+                            failed_summary_tmp,
+                        ) = self._fetch_build_info(
                             slot,
                             tmp_build_id,
                             parsed_date,
@@ -233,6 +251,10 @@ class StatusChecker:
                             msgs[slot][date_back]["df"] = df.reset_index(
                                 drop=True
                             )
+                            for pr, ers in error_summary_tmp.items():
+                                errors_summary[pr] += ers
+                            for pr, frs in failed_summary_tmp.items():
+                                failed_summary[pr] += frs
                             break
                 except AttributeError as err:
                     logging.warning(
@@ -280,3 +302,15 @@ class StatusChecker:
                 f.write(stream)
         else:
             logging.info(stream)
+        for project, counter in errors_summary.items():
+            logging.warning(
+                f" Found in total {counter} ERRORs in "
+                f"BUILDING the project '{project}'. "
+                "Verify this and report if this is not known."
+            )
+        for project, counter in failed_summary.items():
+            logging.warning(
+                f" Found in total {counter} FAILED TESTs in "
+                f"the project '{project}'. "
+                "Verify this and report if this is not known."
+            )
