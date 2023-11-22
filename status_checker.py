@@ -154,6 +154,10 @@ class StatusChecker:
                             except TypeError:
                                 tmp_tmp_res = ["UNKNOWN"]
                                 break
+                            except KeyError:
+                                logging.debug(f'Missing key [{check_type}][{result_name}] in {results}. Output will be incomplete')
+                                tmp_tmp_res = ["UNKNOWN"]
+                                break
                         tmp_res.append(" ".join(tmp_tmp_res))
                     ptf_res.append(" / ".join(tmp_res))
                 failed_MRs = []
