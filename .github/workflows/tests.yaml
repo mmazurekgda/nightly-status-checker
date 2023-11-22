@@ -20,7 +20,7 @@ jobs:
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Install dependencies
       run: |
-        conda env update --file environment.yml --name base
+        conda env update --file environment.yml --name nightly-checker-env
     - name: Test with pytest
       run: |
-        pytest test
+        conda run -n nightly-checker-env pytest test
