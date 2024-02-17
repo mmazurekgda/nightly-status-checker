@@ -129,7 +129,10 @@ class StatusChecker:
                 self._slots[slot] = build_id
         logging.debug(f"Found build ids: {dict(self._slots)}.")
 
-    def _get_short_platforms(self, plist):
+    def _get_short_platforms(
+            self,
+            plist: [],
+    ) -> []:
         """Return list of short platform names to check in results.
         Replace common prefixes by * w.r.t. previous platform considered."""
         ret = []
