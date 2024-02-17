@@ -130,9 +130,9 @@ class StatusChecker:
                 self._slots[slot] = build_id
         logging.debug(f"Found build ids: {dict(self._slots)}.")
 
-    def _get_short_platforms_for_results(self, plist):
-        """Return a list of short platform names for platforms to check in results.
-        Replace common prefixes by * referring to previous platform considered."""
+    def _get_short_platforms(self, plist):
+        """Return list of short platform names to check in results.
+        Replace common prefixes by * w.r.t. previous platform considered."""
         ret = []
         for pc in plist:
             if len(ret) == 0:
@@ -150,7 +150,7 @@ class StatusChecker:
             pp = pc
         return ret
 
-    def _get_Platforms_Projects_for_slot(self, slot: str, build_id: int) -> ([], []):
+    def _get_Platforms_Projects_for_slot(self, slot: str, build_id: int):
         response = requests.get(f"{self.api_page}/{slot}/{build_id}/summary")
         response.raise_for_status()
         parsed = response.json()
@@ -161,7 +161,8 @@ class StatusChecker:
         if 'platforms' in parsed:
             platforms = parsed['platforms']
         if 'projects' in parsed:
-            projects = [pdic['name'] for pdic in parsed['projects'] if pdic['enabled']]
+            projects = [pdic['name'] for pdic in parsed['projects']
+                        if pdic['enabled']]
         return platforms, projects
 
     def _fetch_build_info(
@@ -185,9 +186,10 @@ class StatusChecker:
                 and project["enabled"]
             ):
                 if df.empty:
-                    long_platforms = [pn for pn in self.platforms_to_check if pn in project['results']]
+                    long_platforms = [pn for pn in self.platforms_to_check
+                                      if pn in project['results']]
                     long_platforms.sort(reverse=True)
-                    short_platforms = self._get_short_platforms_for_results(long_platforms)
+                    short_platforms = self._get_short_platforms(long_platforms)
                     # short_platforms = [
                     #    # platform.replace(self.hidden_platform_prefix, "*")
                     #    re.sub(self.hidden_platform_prefix_re, "*", platform)
