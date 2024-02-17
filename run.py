@@ -110,8 +110,10 @@ def dqcs_report(
 @click.command()
 @common
 def mkconfig(date, slots, platforms, projects):
-    """Generate config.py to customize selection of slots, platforms and projects."""
-    cfg_code = """# Module to customize default config of nightly-status-checker
+    """Generate config.py to customize
+    selection of slots, platforms and projects."""
+    cfg_code = """
+# Module to customize default configuration of nightly-status-checker
 
 slots_to_check = [
     {slots_list}

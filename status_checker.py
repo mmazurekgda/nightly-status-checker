@@ -89,10 +89,9 @@ class StatusChecker:
 
     def __init__(
         self,
-        slot_names: list = [],
-        platform_names: list = [],
-        project_names: list = [],
-        cmd_mk_config = False,
+        slot_names: list = (),
+        platform_names: list = (),
+        project_names: list = (),
     ):
         if slot_names:
             self.slots_to_check = slot_names
@@ -118,7 +117,7 @@ class StatusChecker:
             msg = (
                 f"No slots from the list '{self.slots_to_check}' "
                 f"were found in the content of '{self.main_page}'. "
-                "Please, make sure you provided correct slot names."
+                f"Please, make sure you provided correct slot names."
             )
             logging.error(msg)
             raise ValueError(msg)
@@ -134,6 +133,7 @@ class StatusChecker:
         """Return list of short platform names to check in results.
         Replace common prefixes by * w.r.t. previous platform considered."""
         ret = []
+        pp = None
         for pc in plist:
             if len(ret) == 0:
                 ret.append(pc)
@@ -150,7 +150,10 @@ class StatusChecker:
             pp = pc
         return ret
 
-    def _get_Platforms_Projects_for_slot(self, slot: str, build_id: int):
+    def _get_Platforms_Projects_for_slot(self,
+                                         slot: str,
+                                         build_id: int,
+                                         ) -> ([], []):
         response = requests.get(f"{self.api_page}/{slot}/{build_id}/summary")
         response.raise_for_status()
         parsed = response.json()
@@ -363,11 +366,11 @@ class StatusChecker:
             logging.warning(
                 f" Found in total {counter} ERRORs in "
                 f"BUILDING the project '{project}'. "
-                "Verify this and report if this is not known."
+                f"Verify this and report if this is not known."
             )
         for project, counter in failed_summary.items():
             logging.warning(
                 f" Found in total {counter} FAILED TESTs in "
                 f"the project '{project}'. "
-                "Verify this and report if this is not known."
+                f"Verify this and report if this is not known."
             )
