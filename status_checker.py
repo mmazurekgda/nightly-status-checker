@@ -150,10 +150,11 @@ class StatusChecker:
             pp = pc
         return ret
 
-    def _get_Platforms_Projects_for_slot(self,
-                                         slot: str,
-                                         build_id: int,
-                                         ) -> ([], []):
+    def _get_Platforms_Projects_for_slot(
+            self,
+            slot: str,
+            build_id: int,
+    ) -> ([], []):
         response = requests.get(f"{self.api_page}/{slot}/{build_id}/summary")
         response.raise_for_status()
         parsed = response.json()
