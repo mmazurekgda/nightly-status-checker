@@ -149,7 +149,8 @@ class StatusChecker:
             if len(pk) == 0:
                 ret.append(pc)
             else:
-                ret.append('*' + pc[len(pk):])
+                ss = slice(len(pk), len(pc))
+                ret.append('*' + pc[ss])
             pp = pc
         return ret
 
