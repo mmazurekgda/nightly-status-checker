@@ -204,6 +204,20 @@ class StatusChecker:
                     #    for platform in self.platforms_to_check
                     #    if platform in project["results"]
                     # ]
+                    # make short platform names unique for PANDA (add +1,+2, ... to same names in list)
+                    ssplatforms = set(short_platforms)
+                    if len(ssplatforms) < len(short_platforms):
+                        for pn in ssplatforms:
+                            if not pn.startswith('*') or short_platforms.count(pn) == 1:
+                                continue
+                            pc = 1
+                            while True:
+                                try:
+                                    ip = short_platforms.index(pn)
+                                    short_platforms[ip] += '!{}'.format(pc)
+                                    pc += 1
+                                except ValueError:
+                                    break
                     nested_results_cols = [("Project", ""), ("Failed MRs", "")]
                     nested_results_cols += [
                         (platform, "BUILD / TEST")

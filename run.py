@@ -128,7 +128,6 @@ platforms_to_check = [
 ]
 """
     pretty_sep = ",\n    "
-    slots_list = []
     project_list = []
     platform_list = []
     checker = StatusChecker(
