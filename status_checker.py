@@ -18,13 +18,15 @@ from datetime import (
 def tokenizePlatforms(plist):
     tree = {}
     for pp in set(plist):
-        toks = pp.split('-', 3)
+        toks = pp.split("-", 3)
         for i in range(0, 4):
-            tk = '-'.join(toks[0:i])
+            tk = "-".join(toks[0:i])
             if tk in tree:
                 tree[tk].append(pp)
             else:
-                tree[tk] = [pp, ]
+                tree[tk] = [
+                    pp,
+                ]
     return tree
 
 
@@ -130,8 +132,8 @@ class StatusChecker:
         logging.debug(f"Found build ids: {dict(self._slots)}.")
 
     def _get_short_platforms(
-            self,
-            plist: [],
+        self,
+        plist: [],
     ) -> []:
         """Return list of short platform names to check in results.
         Replace common prefixes by * w.r.t. previous platform considered."""
@@ -150,14 +152,14 @@ class StatusChecker:
                 ret.append(pc)
             else:
                 ss = slice(len(pk), len(pc))
-                ret.append('*' + pc[ss])
+                ret.append("*" + pc[ss])
             pp = pc
         return ret
 
     def _get_Platforms_Projects_for_slot(
-            self,
-            slot: str,
-            build_id: int,
+        self,
+        slot: str,
+        build_id: int,
     ) -> ([], []):
         response = requests.get(f"{self.api_page}/{slot}/{build_id}/summary")
         response.raise_for_status()
@@ -166,11 +168,12 @@ class StatusChecker:
         projects = []
         if parsed["aborted"]:
             return platforms, projects
-        if 'platforms' in parsed:
-            platforms = parsed['platforms']
-        if 'projects' in parsed:
-            projects = [pdic['name'] for pdic in parsed['projects']
-                        if pdic['enabled']]
+        if "platforms" in parsed:
+            platforms = parsed["platforms"]
+        if "projects" in parsed:
+            projects = [
+                pdic["name"] for pdic in parsed["projects"] if pdic["enabled"]
+            ]
         return platforms, projects
 
     def _fetch_build_info(
@@ -194,8 +197,11 @@ class StatusChecker:
                 and project["enabled"]
             ):
                 if df.empty:
-                    long_platforms = [pn for pn in self.platforms_to_check
-                                      if pn in project['results']]
+                    long_platforms = [
+                        pn
+                        for pn in self.platforms_to_check
+                        if pn in project["results"]
+                    ]
                     long_platforms.sort(reverse=True)
                     short_platforms = self._get_short_platforms(long_platforms)
                     # short_platforms = [
@@ -204,17 +210,21 @@ class StatusChecker:
                     #    for platform in self.platforms_to_check
                     #    if platform in project["results"]
                     # ]
-                    # make short platform names unique for PANDA (add +1,+2, ... to same names in list)
+                    # make short platform names unique for PANDA
+                    # (add +1,+2, ... to same names in list)
                     ssplatforms = set(short_platforms)
                     if len(ssplatforms) < len(short_platforms):
                         for pn in ssplatforms:
-                            if not pn.startswith('*') or short_platforms.count(pn) == 1:
+                            if (
+                                not pn.startswith("*")
+                                or short_platforms.count(pn) == 1
+                            ):
                                 continue
                             pc = 1
                             while True:
                                 try:
                                     ip = short_platforms.index(pn)
-                                    short_platforms[ip] += '!{}'.format(pc)
+                                    short_platforms[ip] += "!{}".format(pc)
                                     pc += 1
                                 except ValueError:
                                     break
