@@ -15,6 +15,19 @@ from datetime import (
 )
 
 
+def tokenizePlatforms(plist):
+    tree = {}
+    for pp in set(plist):
+        toks = pp.split('-', 3)
+        for i in range(0, 4):
+            tk = '-'.join(toks[0:i])
+            if tk in tree:
+                tree[tk].append(pp)
+            else:
+                tree[tk] = [pp, ]
+    return tree
+
+
 class StatusChecker:
     slots_to_check = [
         "lhcb-sim10-dev",
@@ -76,9 +89,9 @@ class StatusChecker:
 
     def __init__(
         self,
-        slot_names: list = [],
-        platform_names: list = [],
-        project_names: list = [],
+        slot_names: list = (),
+        platform_names: list = (),
+        project_names: list = (),
     ):
         if slot_names:
             self.slots_to_check = slot_names
@@ -87,6 +100,8 @@ class StatusChecker:
         if project_names:
             self.projects_to_check = project_names
         self.get_current_builds()
+        self._tkPlatforms = tokenizePlatforms(self.platforms_to_check)
+        logging.debug("Tokens " + str(self._tkPlatforms))
 
     @request
     def get_current_builds(self):
@@ -102,7 +117,7 @@ class StatusChecker:
             msg = (
                 f"No slots from the list '{self.slots_to_check}' "
                 f"were found in the content of '{self.main_page}'. "
-                "Please, make sure you provided correct slot names."
+                f"Please, make sure you provided correct slot names."
             )
             logging.error(msg)
             raise ValueError(msg)
@@ -113,6 +128,50 @@ class StatusChecker:
             if self._slots[slot] < build_id:
                 self._slots[slot] = build_id
         logging.debug(f"Found build ids: {dict(self._slots)}.")
+
+    def _get_short_platforms(
+            self,
+            plist: [],
+    ) -> []:
+        """Return list of short platform names to check in results.
+        Replace common prefixes by * w.r.t. previous platform considered."""
+        ret = []
+        pp = None
+        for pc in plist:
+            if len(ret) == 0:
+                ret.append(pc)
+                pp = pc
+                continue
+            pk = ""
+            for kk, lst in self._tkPlatforms.items():
+                if pp in lst and pc in lst and len(kk) > len(pk):
+                    pk = kk
+            if len(pk) == 0:
+                ret.append(pc)
+            else:
+                ss = slice(len(pk), len(pc))
+                ret.append('*' + pc[ss])
+            pp = pc
+        return ret
+
+    def _get_Platforms_Projects_for_slot(
+            self,
+            slot: str,
+            build_id: int,
+    ) -> ([], []):
+        response = requests.get(f"{self.api_page}/{slot}/{build_id}/summary")
+        response.raise_for_status()
+        parsed = response.json()
+        platforms = []
+        projects = []
+        if parsed["aborted"]:
+            return platforms, projects
+        if 'platforms' in parsed:
+            platforms = parsed['platforms']
+        if 'projects' in parsed:
+            projects = [pdic['name'] for pdic in parsed['projects']
+                        if pdic['enabled']]
+        return platforms, projects
 
     def _fetch_build_info(
         self,
@@ -128,18 +187,37 @@ class StatusChecker:
             return df, parsed_date
         errors_summary = defaultdict(lambda: 0)
         failed_summary = defaultdict(lambda: 0)
+        long_platforms = []
         for project in parsed["projects"]:
             if (
                 project["name"] in self.projects_to_check
                 and project["enabled"]
             ):
                 if df.empty:
-                    short_platforms = [
-                        # platform.replace(self.hidden_platform_prefix, "*")
-                        re.sub(self.hidden_platform_prefix_re, "*", platform)
-                        for platform in self.platforms_to_check
-                        if platform in project["results"]
-                    ]
+                    long_platforms = [pn for pn in self.platforms_to_check
+                                      if pn in project['results']]
+                    long_platforms.sort(reverse=True)
+                    short_platforms = self._get_short_platforms(long_platforms)
+                    # short_platforms = [
+                    #    # platform.replace(self.hidden_platform_prefix, "*")
+                    #    re.sub(self.hidden_platform_prefix_re, "*", platform)
+                    #    for platform in self.platforms_to_check
+                    #    if platform in project["results"]
+                    # ]
+                    # make short platform names unique for PANDA (add +1,+2, ... to same names in list)
+                    ssplatforms = set(short_platforms)
+                    if len(ssplatforms) < len(short_platforms):
+                        for pn in ssplatforms:
+                            if not pn.startswith('*') or short_platforms.count(pn) == 1:
+                                continue
+                            pc = 1
+                            while True:
+                                try:
+                                    ip = short_platforms.index(pn)
+                                    short_platforms[ip] += '!{}'.format(pc)
+                                    pc += 1
+                                except ValueError:
+                                    break
                     nested_results_cols = [("Project", ""), ("Failed MRs", "")]
                     nested_results_cols += [
                         (platform, "BUILD / TEST")
@@ -149,9 +227,10 @@ class StatusChecker:
                         columns=pd.MultiIndex.from_tuples(nested_results_cols)
                     )
                 ptf_res = []
-                for platform in self.platforms_to_check:
-                    if platform not in project["results"]:
-                        continue
+                # for platform in self.platforms_to_check:
+                for platform in long_platforms:
+                    # if platform not in project["results"]:
+                    #     continue
                     results = project["results"][platform]
                     tmp_res = []
                     for check_type, check_values in self.result_types.items():
@@ -306,11 +385,11 @@ class StatusChecker:
             logging.warning(
                 f" Found in total {counter} ERRORs in "
                 f"BUILDING the project '{project}'. "
-                "Verify this and report if this is not known."
+                f"Verify this and report if this is not known."
             )
         for project, counter in failed_summary.items():
             logging.warning(
                 f" Found in total {counter} FAILED TESTs in "
                 f"the project '{project}'. "
-                "Verify this and report if this is not known."
+                f"Verify this and report if this is not known."
             )
