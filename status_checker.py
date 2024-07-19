@@ -34,6 +34,7 @@ class StatusChecker:
     slots_to_check = [
         "lhcb-sim10-dev",
         "lhcb-sim10",
+        "lhcb-sim11-dev",
         "lhcb-sim11",
     ]
 
@@ -55,6 +56,8 @@ class StatusChecker:
         "x86_64_v2-centos7-gcc12-opt",
         "x86_64_v2-centos7-gcc12+detdesc-opt",
         "x86_64_v2-el9-gcc12-opt",
+        "x86_64_v2-el9-gcc13-opt",
+        "armv8.1_a-el9-gcc13-opt",
     ]
 
     result_types = {
