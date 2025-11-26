@@ -189,10 +189,10 @@ class StatusChecker:
         response = requests.get(f"{self.api_page}/{slot}/{build_id}/summary")
         response.raise_for_status()
         parsed = response.json()
-        if parsed["aborted"]:
-            return df, parsed_date
         errors_summary = defaultdict(lambda: 0)
         failed_summary = defaultdict(lambda: 0)
+        if parsed["aborted"]:
+            return df, parsed["date"], errors_summary, failed_summary
         long_platforms = []
         for project in parsed["projects"]:
             if (
