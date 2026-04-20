@@ -82,9 +82,9 @@ class StatusChecker:
 
     # there is no way you can get the list of build ids
     # from the API, so we have to use the main page...
-    main_page = "https://lhcb-nightlies.web.cern.ch/nightly/"
+    main_page = "https://lhcb-nightlies-legacy.web.cern.ch/nightly/"
 
-    api_page = "https://lhcb-nightlies.web.cern.ch/api/v1/nightly"
+    api_page = "https://lhcb-nightlies-legacy.web.cern.ch/api/v1/nightly"
 
     max_backward_checks = 30
 
