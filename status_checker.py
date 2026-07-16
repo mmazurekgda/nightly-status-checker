@@ -80,11 +80,7 @@ class StatusChecker:
 
     hidden_platform_prefix_re = r"x86_64_v2(-centos7)?(-gcc11)?"
 
-    # there is no way you can get the list of build ids
-    # from the API, so we have to use the main page...
-    main_page = "https://lhcb-nightlies.web.cern.ch/nightly/"
-
-    api_page = "https://lhcb-nightlies.web.cern.ch/api/v1/nightly"
+    api_page = "https://lhcb-nightlies.web.cern.ch/api/{source}/nightly"
 
     max_backward_checks = 30
 
@@ -111,27 +107,25 @@ class StatusChecker:
     @request
     def get_current_builds(self):
         logging.debug("Fetching the most recent build ids.")
-        response = requests.get(self.main_page)
+        response = requests.get(self.api_page.format(source="cidb/get_latest_slot_ids"))
         response.raise_for_status()
-        slots_reg = "|".join(self.slots_to_check)
-        slots_reg = rf"(?:{slots_reg})\/[0-9]{{1,4}}\/"
-        slot_candidates = re.findall(
-            slots_reg, response.content.decode("utf-8")
-        )
+        latest_slots = response.json()
+        wanted_slots = set(self.slots_to_check)
+        slot_candidates = set()
+        for slot_entry, _slot_date in latest_slots:
+            slot_name = slot_entry["name"]
+            if slot_name not in wanted_slots:
+                continue
+            self._slots[slot_name] = int(slot_entry["build_id"])
+            slot_candidates.add(slot_name)
         if not slot_candidates:
             msg = (
                 f"No slots from the list '{self.slots_to_check}' "
-                f"were found in the content of '{self.main_page}'. "
+                f"were found in the content of '{self.api_page.format(source="cidb/get_latest_slot_ids")}'. "
                 f"Please, make sure you provided correct slot names."
             )
             logging.error(msg)
             raise ValueError(msg)
-        for slot_candidate in slot_candidates:
-            slot, build_id, _ = slot_candidate.split("/")
-            build_id = int(build_id)
-            # pick only the latest builds
-            if self._slots[slot] < build_id:
-                self._slots[slot] = build_id
         logging.debug(f"Found build ids: {dict(self._slots)}.")
 
     def _get_short_platforms(
@@ -164,7 +158,7 @@ class StatusChecker:
         slot: str,
         build_id: int,
     ) -> ([], []):
-        response = requests.get(f"{self.api_page}/{slot}/{build_id}/summary")
+        response = requests.get(f"{self.api_page.format(source="v1")}/{slot}/{build_id}/summary")
         response.raise_for_status()
         parsed = response.json()
         platforms = []
@@ -186,7 +180,7 @@ class StatusChecker:
         parsed_date: str,
     ) -> (pd.DataFrame, str):
         df = pd.DataFrame()
-        response = requests.get(f"{self.api_page}/{slot}/{build_id}/summary")
+        response = requests.get(f"{self.api_page.format(source="v1")}/{slot}/{build_id}/summary")
         response.raise_for_status()
         parsed = response.json()
         errors_summary = defaultdict(lambda: 0)
