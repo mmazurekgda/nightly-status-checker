@@ -181,7 +181,18 @@ class StatusChecker:
     ) -> (pd.DataFrame, str):
         df = pd.DataFrame()
         response = requests.get(f"{self.api_page.format(source='v1')}/{slot}/{build_id}/summary")
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as err:
+            # Some build IDs from CIDB are not queryable via v1 summary.
+            # Return an empty payload so caller can continue scanning back.
+            if response.status_code == 404:
+                logging.debug(
+                    f"Missing v1 summary for {slot}/{build_id}; "
+                    "trying older build id."
+                )
+                return df, parsed_date, defaultdict(lambda: 0), defaultdict(lambda: 0)
+            raise err
         parsed = response.json()
         errors_summary = defaultdict(lambda: 0)
         failed_summary = defaultdict(lambda: 0)
@@ -361,7 +372,7 @@ class StatusChecker:
                         stream += f"<details><summary>{parsed_date}/{values['build_id']}</summary>"  # noqa: E501
                         stream += f"link to <a href=\"https://lhcb-nightlies.web.cern.ch/nightly/{slot}/{values['build_id']}/\">"  # noqa: E501
                         stream += f"{slot}/{values['build_id']}</a></br>"
-                        pretty_df = values["df"].style.applymap(color_values)
+                        pretty_df = values["df"].style.map(color_values)
                         stream += f"{pretty_df.to_html()}</details>"
                     else:
                         stream += (
