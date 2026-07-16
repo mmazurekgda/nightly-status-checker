@@ -121,7 +121,7 @@ class StatusChecker:
         if not slot_candidates:
             msg = (
                 f"No slots from the list '{self.slots_to_check}' "
-                f"were found in the content of '{self.api_page.format(source="cidb/get_latest_slot_ids")}'. "
+                f"were found in the content of '{self.api_page.format(source='cidb/get_latest_slot_ids')}'. "
                 f"Please, make sure you provided correct slot names."
             )
             logging.error(msg)
@@ -158,7 +158,7 @@ class StatusChecker:
         slot: str,
         build_id: int,
     ) -> ([], []):
-        response = requests.get(f"{self.api_page.format(source="v1")}/{slot}/{build_id}/summary")
+        response = requests.get(f"{self.api_page.format(source='v1')}/{slot}/{build_id}/summary")
         response.raise_for_status()
         parsed = response.json()
         platforms = []
@@ -180,7 +180,7 @@ class StatusChecker:
         parsed_date: str,
     ) -> (pd.DataFrame, str):
         df = pd.DataFrame()
-        response = requests.get(f"{self.api_page.format(source="v1")}/{slot}/{build_id}/summary")
+        response = requests.get(f"{self.api_page.format(source='v1')}/{slot}/{build_id}/summary")
         response.raise_for_status()
         parsed = response.json()
         errors_summary = defaultdict(lambda: 0)
